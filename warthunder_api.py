@@ -1,8 +1,6 @@
 import json
 import urllib.request
 from typing import Any
-from map_catalog import find_map_name
-from map_image import read_map_image_hash
 
 API_BASE = "http://127.0.0.1:8111"
 ENDPOINTS = (
@@ -18,6 +16,11 @@ class ApiResponseError(ValueError):
         super().__init__(reason)
         self.reason = reason
 
+
+class ResponseTooLargeError(ValueError):
+    pass
+
+
 class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -29,7 +32,7 @@ OPENER = urllib.request.build_opener(
 )
 
 
-def fetch_json(path: str) -> dict[str, Any]:
+def fetch_json_data(path: str) -> dict[str, Any] | list[Any]:
     if path not in ENDPOINTS:
         raise ValueError("Endpoint nie znajduje się na liście dozwolonych")
 
@@ -43,10 +46,27 @@ def fetch_json(path: str) -> dict[str, Any]:
         body = response.read(MAX_RESPONSE_BYTES + 1)
 
     if len(body) > MAX_RESPONSE_BYTES:
-        raise ValueError("Odpowiedź lokalnego API jest za duża")
+        raise ResponseTooLargeError("Odpowiedź lokalnego API jest za duża")
 
-    data = json.loads(body)
+    try:
+        data = json.loads(body)
+    except json.JSONDecodeError as error:
+        raise ApiResponseError(
+            f"Nieprawidłowy JSON (linia {error.lineno}, kolumna {error.colno})"
+        ) from error
+    if not isinstance(data, (dict, list)):
+        raise ApiResponseError(
+            "Oczekiwano obiektu lub tablicy JSON; "
+            f"otrzymano {type(data).__name__}"
+        )
+
+    return data
+
+
+def fetch_json(path: str) -> dict[str, Any]:
+    data = fetch_json_data(path)
     if not isinstance(data, dict):
-        raise ValueError("Oczekiwano obiektu JSON")
-
+        raise ApiResponseError(
+            f"Oczekiwano obiektu JSON; otrzymano {type(data).__name__}"
+        )
     return data

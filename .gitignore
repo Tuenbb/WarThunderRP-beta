@@ -1,5 +1,29 @@
-git add main.py .gitignore
-git commit -m "Start War Thunder RPC project"
-git branch -M main
-git remote add origin https://github.com/Tuenbb/WarThunderRPC.git
-git push -u origin main
+# Python bytecode and test/tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+.venv*/
+venv/
+env/
+
+# Packaging/build outputs
+build/
+dist/
+*.spec.bak
+*.manifest
+*.exe
+*.dll
+*.pyd
+*.whl
+
+# Game-derived artwork is intentionally kept local, not in the public source release
+assets/
+
+# Local editor/OS files
+.DS_Store
+Thumbs.db
