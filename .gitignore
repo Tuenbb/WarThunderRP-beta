@@ -1,0 +1,5 @@
+git add main.py .gitignore
+git commit -m "Start War Thunder RPC project"
+git branch -M main
+git remote add origin https://github.com/Tuenbb/WarThunderRPC.git
+git push -u origin main
