@@ -1,138 +1,143 @@
 # WarThunderRPC
 
-This worktree includes a beta tester report control and a reproducible Windows
-EXE build recipe. See [BETA_TESTING.md](BETA_TESTING.md) for prerequisites,
-build/run steps, test scenarios, and the diagnostic report's privacy boundary.
+To repozytorium zawiera wersję beta z systemem raportowania dla testerów oraz powtarzalną instrukcją budowania pliku EXE na Windows. Zobacz [BETA_TESTING.md](BETA_TESTING.md), aby zapoznać się z wymaganiami, instrukcją budowania i uruchamiania, scenariuszami testowymi oraz zakresem danych zawartych w raporcie diagnostycznym.
 
-Vehicle names and nations are resolved from the public War Thunder Wiki page at
-`https://wiki.warthunder.com/unit/<model-id>`. The app reads the page title and
-the vehicle card's **Research country** field; it does not infer a nation from
-the vehicle ID or vehicle type. Only recognized country identifiers receive a
-flag. If the page or its country field is unavailable, the app keeps the
-fallback name and shows no newly inferred flag.
+Nazwy pojazdów i nacje są pobierane z publicznej strony War Thunder Wiki:
+`https://wiki.warthunder.com/unit/<model-id>`.
+Aplikacja odczytuje tytuł strony oraz pole **Research country** z karty pojazdu. Nie próbuje określać nacji na podstawie ID pojazdu ani jego typu. Tylko rozpoznane identyfikatory państw otrzymują flagę. Jeśli strona lub pole z państwem jest niedostępne, aplikacja zachowuje nazwę zapasową i nie dodaje nowo ustalonej flagi.
 
-Lookups use HTTPS to `wiki.warthunder.com` only, with a five-second timeout and
-a 2 MiB page limit. The local cache is stored at
-`%APPDATA%/WarThunderRS/vehicle_names.json` and is limited to 1,000 entries and
-1 MiB. Existing name-only cache entries remain readable and are upgraded with
-nation data after a successful Wiki lookup. No remote images or page scripts
-are fetched by this app. Scripts from Wiki pages are never executed.
+Zapytania są wykonywane wyłącznie przez HTTPS do `wiki.warthunder.com`, z limitem czasu wynoszącym pięć sekund i limitem rozmiaru strony 2 MiB. Lokalny cache znajduje się w:
+`%APPDATA%/WarThunderRS/vehicle_names.json`
+i jest ograniczony do 1000 wpisów oraz 1 MiB. Istniejące wpisy cache zawierające tylko nazwę nadal mogą być odczytywane i zostaną uzupełnione o dane dotyczące nacji po pomyślnym zapytaniu do Wiki. Aplikacja nie pobiera zdalnych obrazów ani skryptów stron. Skrypty ze stron Wiki nigdy nie są wykonywane.
 
-Vehicle classes are recognized from known local API `army` values and exact
-vehicle category segments (ground, aircraft, helicopters, ships, and boats).
-Unknown values are not guessed. Model IDs without a category still get a
-readable name and a bounded, ID-derived Wiki image URL; if the API provides no
-model ID, the app reports the known class without inventing a vehicle image.
-For nations with a local flag image, the Discord small-image key is derived
-from the conventional filename (`country_israel` for
-`country_israel.png`). The public source release intentionally omits all image
-files; Discord requires these keys to be registered in the application's Rich
-Presence asset portal. Recognized nations still retain their text flag even
-when no local artwork is present.
+Klasy pojazdów są rozpoznawane na podstawie znanych lokalnych wartości API `army` oraz dokładnych segmentów kategorii pojazdów: `ground`, `aircraft`, `helicopters`, `ships` i `boats`. Nieznane wartości nie są zgadywane. ID modeli bez kategorii nadal otrzymują czytelną nazwę oraz ograniczony adres URL obrazu Wiki wynikający z ID. Jeśli API nie udostępnia ID modelu, aplikacja podaje znaną klasę, ale nie wymyśla obrazu pojazdu.
 
-Battle state can still be identified when `/indicators` reports invalid or
-unavailable vehicle data, provided `/map_info.json` is valid and
-`/mission.json` contains an active primary objective. In that case the app
-shows the battle and map but labels vehicle data unavailable; the current
-local API responses do not expose a ship name or class for that situation.
+Dla nacji posiadających lokalny obraz flagi klucz małego obrazka Discorda jest tworzony na podstawie standardowej nazwy pliku, np. `country_israel` dla `country_israel.png`. Publiczna wersja źródłowa celowo nie zawiera żadnych plików graficznych. Discord wymaga, aby takie klucze były zarejestrowane w panelu zasobów Rich Presence aplikacji. Rozpoznane nacje nadal zachowują tekstową nazwę flagi, nawet jeśli lokalna grafika nie jest dostępna.
 
-To inspect whether the existing local API offers further map or player-vessel
-metadata, run `python probe_battle_metadata.py` during a battle. It reads only
-`/map_info.json`, `/mission.json`, and `/map_obj.json`; output is bounded and
-redacts dynamic identifiers and unrelated string values. It displays only
-`/mission.json`'s bounded `status` and objective `text` values, escaped for
-terminal safety, as well as safe endpoint error reasons. `/map_obj.json` is
-read as its JSON array response, rather than requiring an object; the probe
-summarizes object types and explicit player-related boolean fields across all
-records, while keeping record output bounded.
+Stan bitwy nadal może zostać rozpoznany, gdy `/indicators` zwraca nieprawidłowe lub niedostępne dane pojazdu, pod warunkiem że `/map_info.json` jest prawidłowy, a `/mission.json` zawiera aktywny główny cel. W takim przypadku aplikacja pokazuje bitwę i mapę, ale oznacza dane pojazdu jako niedostępne. Obecne odpowiedzi lokalnego API nie udostępniają w takiej sytuacji nazwy ani klasy okrętu.
 
-To inspect concise structure and map candidates from the local API, run
-`python -B probe_map.py`. It requests only `/state`, `/map_info.json`,
-`/map_obj.json`, and `/indicators`, in that order, and continues after
-endpoint errors. Object responses show bounded top-level field/type summaries.
-The `/map_obj.json` array shows at most three records with bounded field keys
-and sample JSON. Every endpoint reports matches for the exact scalar keys
-`map_id`, `name`, `map_name`, `location`, `level`, and `zone_id`. Requests use
-the guarded localhost client with a two-second timeout, disabled proxies,
-blocked redirects, and a one-megabyte response cap.
+Aby sprawdzić, czy obecne lokalne API oferuje dodatkowe informacje o mapie lub pojeździe gracza, uruchom podczas bitwy:
 
-To inspect the current state and intended Rich Presence image inputs without
-connecting to Discord or making Wiki requests, run
-`python -B probe_presence.py`. It reads only the existing allowlisted local
-game endpoints and the local vehicle-name cache. A vehicle URL host or local
-asset filename does not prove that Discord accepts it; image keys must also be
-registered in the Discord application's Rich Presence assets. It reports
-whether `details` and `state` are actually present in the selected profile
-without printing their configured text, whether vehicle/speed template values
-are available, the intended large/small image inputs, and the image fallback
-order. It does not make a Discord RPC connection or a Wiki request.
+```powershell
+python probe_battle_metadata.py
+```
 
-Discord rejects an empty `state` field. When the second line is disabled or
-resolves empty and at least one image is being sent, the app uses a single
-Braille blank (`U+2800`) as the protocol value so the line should remain
-visually blank while Discord accepts the non-empty state. With no images, the
-`state` field is omitted. Please verify Discord's live rendering with
-**Hangar → second line: Wyłączona** in the running app.
-If Discord rejects some image candidates but accepts a fallback, the GUI RPC
-status reports whether the vehicle image, flag, both, or neither was retained.
+Program odczytuje wyłącznie `/map_info.json`, `/mission.json` i `/map_obj.json`. Wynik jest ograniczony, a dynamiczne identyfikatory i niepowiązane wartości tekstowe są ukrywane. Wyświetlane są jedynie ograniczone wartości `status` oraz `text` celów z `/mission.json`, zabezpieczone przed niebezpiecznymi znakami terminala, a także bezpieczne informacje o błędach endpointów.
 
-Map names from explicit `map_info` or mission map-title fields take priority.
-The currently reported `/map_info.json` contains only map grid parameters and
-no title; objective text is not treated as a map name. The confirmed
-`0000002c7ebdffff` fingerprint is included as a fallback for
-`[Dominacja #1] Kvarken Południowy`, not as a replacement for automatic
-metadata or a complete map catalog. `/map_obj.json` was unavailable in the
-latest object-only probe. The array-capable probe found map/spawn markers but
-no explicit player-to-vessel association field.
+`/map_obj.json` jest odczytywany jako tablica JSON, a nie wymagany obiekt. Program podsumowuje typy obiektów oraz jawne pola logiczne dotyczące gracza we wszystkich rekordach, jednocześnie ograniczając ilość wyświetlanych danych.
 
-## Registering map names
+Aby sprawdzić skróconą strukturę oraz możliwe informacje o mapie z lokalnego API, uruchom:
 
-The app resolves names in this order: a reliable title from local API metadata,
-the user's fingerprint registry, then the checked-in `map_catalog.json`
-fallback. Register a confirmed in-game title while that map is active:
+```powershell
+python -B probe_map.py
+```
+
+Program odpyta tylko `/state`, `/map_info.json`, `/map_obj.json` i `/indicators`, w tej kolejności, oraz będzie kontynuował działanie nawet po błędzie któregoś endpointu. Dla odpowiedzi będących obiektami wyświetlane są ograniczone podsumowania pól i typów na najwyższym poziomie.
+
+Dla tablicy `/map_obj.json` wyświetlane są maksymalnie trzy rekordy wraz z ograniczonymi nazwami pól i przykładowym JSON-em. Każdy endpoint sprawdza występowanie dokładnych kluczy skalarnych:
+`map_id`, `name`, `map_name`, `location`, `level` oraz `zone_id`.
+
+Zapytania korzystają z zabezpieczonego klienta localhost z limitem czasu dwóch sekund, wyłączonymi proxy, zablokowanymi przekierowaniami oraz limitem odpowiedzi wynoszącym 1 MB.
+
+Aby sprawdzić aktualny stan oraz planowane dane obrazów Rich Presence bez łączenia się z Discordem ani wykonywania zapytań do Wiki, uruchom:
+
+```powershell
+python -B probe_presence.py
+```
+
+Program odczytuje wyłącznie dozwolone lokalne endpointy gry oraz lokalny cache nazw pojazdów. Host URL pojazdu ani nazwa lokalnego pliku graficznego nie gwarantują, że Discord go zaakceptuje. Klucze obrazów muszą również być zarejestrowane w zasobach Rich Presence aplikacji Discord.
+
+Program informuje, czy `details` i `state` są faktycznie obecne w wybranym profilu, bez wyświetlania ich skonfigurowanej treści. Sprawdza również dostępność wartości szablonów pojazdu/prędkości, planowane źródła dużego i małego obrazka oraz kolejność stosowania obrazów zastępczych. Nie nawiązuje połączenia Discord RPC ani nie wykonuje zapytań do Wiki.
+
+Discord odrzuca puste pole `state`. Gdy druga linia jest wyłączona lub jej wynik jest pusty, a jednocześnie wysyłany jest co najmniej jeden obraz, aplikacja używa pojedynczego znaku Braille typu „blank” (`U+2800`) jako wartości protokołu. Dzięki temu linia powinna pozostać wizualnie pusta, a Discord zaakceptuje niepusty `state`. Gdy nie ma żadnych obrazów, pole `state` jest pomijane.
+
+Sprawdź działanie w Discordzie przy ustawieniu:
+
+**Hangar → druga linia: Wyłączona**
+
+Jeśli Discord odrzuci niektóre proponowane obrazy, ale zaakceptuje obraz zastępczy, status RPC w GUI pokaże, czy zachowano obraz pojazdu, flagę, oba obrazy czy żaden z nich.
+
+Nazwy map pochodzące z jawnych pól `map_info` lub tytułów mapy w misji mają najwyższy priorytet. Obecny `/map_info.json` zawiera wyłącznie parametry siatki mapy i nie posiada jej nazwy. Tekst celu misji nie jest traktowany jako nazwa mapy.
+
+Potwierdzony fingerprint `0000002c7ebdffff` jest zawarty jako rozwiązanie zastępcze dla:
+`[Dominacja #1] Kvarken Południowy`
+
+Nie zastępuje on automatycznego odczytu metadanych ani kompletnego katalogu map. `/map_obj.json` był niedostępny podczas ostatniego testu działającego wyłącznie na obiektach. Test obsługujący tablice znalazł znaczniki mapy/spawnu, ale nie znalazł jednoznacznego pola łączącego gracza z konkretnym pojazdem.
+
+## Rejestrowanie nazw map
+
+Aplikacja ustala nazwę mapy w następującej kolejności:
+
+1. wiarygodna nazwa z lokalnych metadanych API,
+2. rejestr fingerprintów użytkownika,
+3. znajdujący się w repozytorium zapasowy `map_catalog.json`.
+
+Aby zarejestrować potwierdzoną nazwę mapy, gdy jest ona aktualnie aktywna, użyj:
 
 ```powershell
 python register_map.py "[Dominacja #1] Kvarken Południowy"
 ```
 
-The command reads only the current fingerprint from the local `/map.img` API
-and saves the confirmed name to
-`%APPDATA%\WarThunderRS\map_names.json`; it does not modify game files or the
-checked-in catalog. The registry is updated atomically and limited to 1,000
-entries and 256 KiB. Restart or refresh the app after registering if its map
-display has not updated yet.
+Polecenie odczytuje wyłącznie aktualny fingerprint z lokalnego API `/map.img` i zapisuje potwierdzoną nazwę do:
 
-An optional `.bin` directory can be listed to help inspect possible level
-identifiers:
+`%APPDATA%\WarThunderRS\map_names.json`
+
+Nie modyfikuje plików gry ani znajdującego się w repozytorium katalogu. Rejestr jest aktualizowany atomowo i ograniczony do 1000 wpisów oraz 256 KiB.
+
+Jeżeli nazwa mapy nie zaktualizuje się od razu, uruchom ponownie aplikację lub odśwież jej stan.
+
+Opcjonalny katalog `.bin` może zostać podany w celu sprawdzenia potencjalnych identyfikatorów poziomów:
 
 ```powershell
-python register_map.py "Confirmed in-game title" --levels-dir "Z:\path\to\War Thunder\levels"
+python register_map.py "Potwierdzona nazwa mapy" --levels-dir "Z:\path\to\War Thunder\levels"
 ```
 
-The directory is never guessed or hard-coded; only its `.bin` filenames are
-listed, and their stems are explicitly unconfirmed candidates. To store a
-level ID annotation, pass `--level-id "candidate_stem"` after checking it
-yourself. The annotation does not affect map-name resolution and is not
-presented as an API-confirmed identifier. Run the app with `python main.py`.
+Ścieżka do katalogu nigdy nie jest zgadywana ani wpisywana na sztywno. Program wyświetla wyłącznie nazwy plików `.bin`, a ich nazwy bazowe są wyraźnie oznaczone jako niepotwierdzone kandydatury.
 
-## Rich Presence customization
+Aby zapisać adnotację dotyczącą ID poziomu, użyj:
 
-Choose **Ustawienia Rich Presence…** in the running app to configure each
-state's first and second line. In a custom second line, the app supports
-`{vehicle}`, `{speed}`, `{ias}`, `{tas}`, and `{kills}`. Speed/IAS/TAS use the
-`/state` values reported by the local game API; `{speed}` prefers IAS and falls
-back to TAS. Put a whole optional phrase in square brackets, for example
-`[{vehicle} — IAS {ias}]`, so the phrase disappears when one of its values is
-unavailable. The current API payloads checked by the app do not expose a
-verified match kill-count field, so `{kills}` is blank for now.
+```powershell
+--level-id "candidate_stem"
+```
 
-To inspect the safe local API fields while flying or in battle, run
-`python -B probe_vehicle_state.py`. It reads only `/indicators` and `/state`,
-prints the known speed fields, and reports a bounded set of scalar paths whose
-names contain `kill`, `frag`, or `score`. It does not print the full response.
-An observed candidate still needs confirmation before it can be treated as a
-kill count.
+po samodzielnym sprawdzeniu tego ID. Adnotacja nie wpływa na rozpoznawanie nazwy mapy i nie jest przedstawiana jako identyfikator potwierdzony przez API.
 
-Use **Zakończ aplikację** in the main window to stop the poller and tray icon,
-clear Discord Rich Presence, and exit. Closing the window itself continues to
-minimize the app to the tray.
+Uruchom aplikację za pomocą:
+
+```powershell
+python main.py
+```
+
+## Dostosowywanie Rich Presence
+
+W uruchomionej aplikacji wybierz **Ustawienia Rich Presence…**, aby skonfigurować pierwszą i drugą linię dla każdego stanu.
+
+Własna druga linia obsługuje:
+
+`{vehicle}`, `{speed}`, `{ias}`, `{tas}` oraz `{kills}`.
+
+Wartości prędkości, IAS i TAS pochodzą z `/state`, udostępnianego przez lokalne API gry. `{speed}` preferuje IAS, a jeśli IAS nie jest dostępne, korzysta z TAS.
+
+Całe opcjonalne wyrażenie można umieścić w nawiasach kwadratowych, np.:
+
+```text
+[{vehicle} — IAS {ias}]
+```
+
+Wtedy całe wyrażenie zniknie, jeśli jedna z jego wartości będzie niedostępna.
+
+Obecne dane API sprawdzane przez aplikację nie udostępniają potwierdzonego pola z liczbą zabójstw w meczu, dlatego `{kills}` pozostaje na razie puste.
+
+Aby sprawdzić bezpieczne pola lokalnego API podczas lotu lub bitwy, uruchom:
+
+```powershell
+python -B probe_vehicle_state.py
+```
+
+Program odczytuje wyłącznie `/indicators` i `/state`, wyświetla znane pola prędkości oraz ograniczony zestaw ścieżek skalarnych, których nazwy zawierają `kill`, `frag` lub `score`. Nie wyświetla pełnej odpowiedzi API.
+
+Zaobserwowane potencjalne pole musi zostać dodatkowo potwierdzone, zanim będzie można traktować je jako licznik zabójstw.
+
+Użyj **Zakończ aplikację** w głównym oknie, aby zatrzymać poller i ikonę w zasobniku systemowym, wyczyścić Discord Rich Presence oraz zamknąć aplikację.
+
+Samo zamknięcie okna powoduje natomiast dalsze działanie aplikacji w zasobniku systemowym.
